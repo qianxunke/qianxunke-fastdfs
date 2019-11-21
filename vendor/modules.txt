@@ -1,0 +1,69 @@
+# github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d
+github.com/StackExchange/wmi
+# github.com/astaxie/beego v1.12.0
+github.com/astaxie/beego/httplib
+# github.com/bmizerany/pat v0.0.0-20170815010413-6226ea591a40
+github.com/bmizerany/pat
+# github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575
+github.com/cihub/seelog/archive
+github.com/cihub/seelog/archive/gzip
+github.com/cihub/seelog/archive/tar
+github.com/cihub/seelog/archive/zip
+# github.com/deckarep/golang-set v1.7.1
+github.com/deckarep/golang-set
+# github.com/eventials/go-tus v0.0.0-20190617130015-9db47421f6a0
+github.com/eventials/go-tus
+# github.com/go-ole/go-ole v1.2.4
+github.com/go-ole/go-ole
+github.com/go-ole/go-ole/oleutil
+# github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
+github.com/golang/snappy
+# github.com/jinzhu/gorm v1.9.11
+github.com/jinzhu/gorm
+github.com/jinzhu/gorm/dialects/sqlite
+# github.com/jinzhu/inflection v1.0.0
+github.com/jinzhu/inflection
+# github.com/json-iterator/go v1.1.8
+github.com/json-iterator/go
+# github.com/mattn/go-sqlite3 v1.11.0
+github.com/mattn/go-sqlite3
+# github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+github.com/modern-go/concurrent
+# github.com/modern-go/reflect2 v1.0.1
+github.com/modern-go/reflect2
+# github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+github.com/nfnt/resize
+# github.com/radovskyb/watcher v1.0.7
+github.com/radovskyb/watcher
+# github.com/shirou/gopsutil v2.19.10+incompatible
+github.com/shirou/gopsutil/disk
+github.com/shirou/gopsutil/internal/common
+github.com/shirou/gopsutil/mem
+# github.com/sjqzhang/goutil v0.0.0-20190521040736-8e3b861db0d2
+github.com/sjqzhang/goutil
+# github.com/sjqzhang/seelog v0.0.0-20180104061743-556439109558
+github.com/sjqzhang/seelog
+# github.com/sjqzhang/tusd v0.0.0-20190220031306-a6a9d78ef54a
+github.com/sjqzhang/tusd
+github.com/sjqzhang/tusd/filestore
+github.com/sjqzhang/tusd/uid
+# github.com/syndtr/goleveldb v1.0.0
+github.com/syndtr/goleveldb/leveldb
+github.com/syndtr/goleveldb/leveldb/cache
+github.com/syndtr/goleveldb/leveldb/comparer
+github.com/syndtr/goleveldb/leveldb/errors
+github.com/syndtr/goleveldb/leveldb/filter
+github.com/syndtr/goleveldb/leveldb/iterator
+github.com/syndtr/goleveldb/leveldb/journal
+github.com/syndtr/goleveldb/leveldb/memdb
+github.com/syndtr/goleveldb/leveldb/opt
+github.com/syndtr/goleveldb/leveldb/storage
+github.com/syndtr/goleveldb/leveldb/table
+github.com/syndtr/goleveldb/leveldb/util
+# golang.org/x/sys v0.0.0-20190222072716-a9d3bda3a223 => github.com/golang/sys v0.0.0-20190318195719-6c81ef8f67ca
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# gopkg.in/Acconut/lockfile.v1 v1.1.0
+gopkg.in/Acconut/lockfile.v1
+# gopkg.in/yaml.v2 v2.2.2
+gopkg.in/yaml.v2
