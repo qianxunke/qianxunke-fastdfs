@@ -39,7 +39,7 @@ const (
 	CONST_MESSAGE_CLUSTER_IP       = "Can only be called by the cluster ip or 127.0.0.1 or admin_ips(cfg.json),current ip:%s"
 	CfgJson                        = `{
 	"绑定端号": "端口",
-	"addr": ":8080",
+	"addr": ":9888",
 	"PeerID": "集群内唯一,请使用0-9的单字符，默认自动生成",
 	"peer_id": "%s",
 	"本主机地址": "本机http地址,默认自动生成(注意端口必须与addr中的端口一致），必段为内网，自动生成不为内网请自行修改，下同",
@@ -143,8 +143,6 @@ const (
 	`
 )
 
-
-
 var (
 	FileName                    string
 	ptr                         unsafe.Pointer
@@ -157,7 +155,7 @@ var (
 	LARGE_DIR_NAME              = "haystack"
 	LARGE_DIR                   = STORE_DIR + "/haystack"
 	CONST_LEVELDB_FILE_NAME     = DATA_DIR + "/qianxunke.db"
-	CONST_SQLLITE_NAME          =      DATA_DIR + "/gorm.db"
+	CONST_SQLLITE_NAME          = DATA_DIR + "/gorm.db"
 	CONST_LOG_LEVELDB_FILE_NAME = DATA_DIR + "/log.db"
 	CONST_STAT_FILE_NAME        = DATA_DIR + "/stat.json"
 	CONST_CONF_FILE_NAME        = CONF_DIR + "/cfg.json"
@@ -236,7 +234,7 @@ type GloablConfig struct {
 	UploadWorker         int      `json:"upload_worker"`
 	UploadQueueSize      int      `json:"upload_queue_size"`
 	RetryCount           int      `json:"retry_count"`
-	IsOpenDB             bool       `json:"is_open_db"`
+	IsOpenDB             bool     `json:"is_open_db"`
 	Db                   DB       `json:"db"`
 }
 

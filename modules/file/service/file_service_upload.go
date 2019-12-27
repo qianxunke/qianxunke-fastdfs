@@ -17,6 +17,12 @@ import (
 	"time"
 )
 
+type ResponseEntity struct {
+	Code    int64       `json:"code,omitempty"`
+	Message string      `json:"message,omitempty"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
 func (this *server) ConsumerUpload() {
 	ConsumerFunc := func() {
 		for {
@@ -98,8 +104,8 @@ func (this *server) upload(w http.ResponseWriter, r *http.Request) {
 		if output == "" {
 			output = "text"
 		}
-		if !this.util.Contains(output, []string{"json", "text"}) {
-			_, _ = w.Write([]byte("output just support json or text"))
+		if !this.util.Contains(output, []string{"json", "text","standard"}) {
+			_, _ = w.Write([]byte("output just support json or text or standard"))
 			return
 		}
 		fileInfo.Scene = scene
@@ -126,7 +132,14 @@ func (this *server) upload(w http.ResponseWriter, r *http.Request) {
 						_, _ = w.Write([]byte(err.Error()))
 					}
 					_, _ = w.Write(data)
-				} else {
+				} else if output=="standard" {
+					resp:=&ResponseEntity{}
+					resp.Message="ok"
+					resp.Code=http.StatusOK
+					resp.Data=fileResult.Url
+					data,_=json.Marshal(resp)
+					_, _ = w.Write(data)
+				}else {
 					_, _ = w.Write([]byte(fileResult.Url))
 				}
 				return
@@ -165,7 +178,14 @@ func (this *server) upload(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte(err.Error()))
 			}
 			_, _ = w.Write(data)
-		} else {
+		} else if output=="standard" {
+			resp:=&ResponseEntity{}
+			resp.Message="ok"
+			resp.Code=http.StatusOK
+			resp.Data=fileResult.Url
+			data,_=json.Marshal(resp)
+			_, _ = w.Write(data)
+		}else {
 			_, _ = w.Write([]byte(fileResult.Url))
 		}
 		return
@@ -185,6 +205,13 @@ func (this *server) upload(w http.ResponseWriter, r *http.Request) {
 				_ = log.Error(err)
 				_, _ = w.Write([]byte(err.Error()))
 			}
+			_, _ = w.Write(data)
+		}else if output=="standard" {
+			resp:=&ResponseEntity{}
+			resp.Message="ok"
+			resp.Code=http.StatusOK
+			resp.Data=fileResult.Url
+			data,_=json.Marshal(resp)
 			_, _ = w.Write(data)
 		} else {
 			_, _ = w.Write([]byte(fileResult.Url))
