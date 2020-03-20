@@ -13,20 +13,20 @@ import (
 	"time"
 )
 
-func (this *server) CleanAndBackUp() {
+func (s *server) CleanAndBackUp() {
 	Clean := func() {
 		var (
 			filenames []string
 			yesterday string
 		)
-		if this.curDate != this.util.GetToDay() {
+		if s.curDate != s.util.GetToDay() {
 			filenames = []string{config.CONST_Md5_QUEUE_FILE_NAME, config.CONST_Md5_ERROR_FILE_NAME, config.CONST_REMOME_Md5_FILE_NAME}
-			yesterday = this.util.GetDayFromTimeStamp(time.Now().AddDate(0, 0, -1).Unix())
+			yesterday = s.util.GetDayFromTimeStamp(time.Now().AddDate(0, 0, -1).Unix())
 			for _, filename := range filenames {
-				this.CleanLogLevelDBByDate(yesterday, filename)
+				s.CleanLogLevelDBByDate(yesterday, filename)
 			}
-			this.BackUpMetaDataByDate(yesterday)
-			this.curDate = this.util.GetToDay()
+			s.BackUpMetaDataByDate(yesterday)
+			s.curDate = s.util.GetToDay()
 		}
 	}
 	go func() {
@@ -38,7 +38,7 @@ func (this *server) CleanAndBackUp() {
 }
 
 
-func (this *server) BackUp(w http.ResponseWriter, r *http.Request) {
+func (s *server) BackUp(w http.ResponseWriter, r *http.Request) {
 	var (
 		err    error
 		date   string
@@ -51,13 +51,13 @@ func (this *server) BackUp(w http.ResponseWriter, r *http.Request) {
 	date = r.FormValue("date")
 	inner = r.FormValue("inner")
 	if date == "" {
-		date = this.util.GetToDay()
+		date = s.util.GetToDay()
 	}
-	if this.IsPeer(r) {
+	if s.IsPeer(r) {
 		if inner != "1" {
 			for _, peer := range config.Config().Peers {
 				backUp := func(peer string, date string) {
-					url = fmt.Sprintf("%s%s", peer, this.getRequestURI("backup"))
+					url = fmt.Sprintf("%s%s", peer, s.getRequestURI("backup"))
 					req := httplib.Post(url)
 					req.Param("date", date)
 					req.Param("inner", "1")
@@ -69,16 +69,16 @@ func (this *server) BackUp(w http.ResponseWriter, r *http.Request) {
 				go backUp(peer, date)
 			}
 		}
-		go this.BackUpMetaDataByDate(date)
+		go s.BackUpMetaDataByDate(date)
 		result.Message = "back job start..."
-		_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+		_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 	} else {
-		result.Message = this.GetClusterNotPermitMessage(r)
-		_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+		result.Message = s.GetClusterNotPermitMessage(r)
+		_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 	}
 }
 
-func (this *server) BackUpMetaDataByDate(date string) {
+func (s *server) BackUpMetaDataByDate(date string) {
 	defer func() {
 		if re := recover(); re != nil {
 			buffer := debug.Stack()
@@ -100,14 +100,14 @@ func (this *server) BackUpMetaDataByDate(date string) {
 		fi           os.FileInfo
 	)
 	logFileName = config.DATA_DIR + "/" + date + "/" + config.CONST_FILE_Md5_FILE_NAME
-	this.lockMap.LockKey(logFileName)
-	defer this.lockMap.UnLockKey(logFileName)
+	s.lockMap.LockKey(logFileName)
+	defer s.lockMap.UnLockKey(logFileName)
 	metaFileName = config.DATA_DIR + "/" + date + "/" + "meta.data"
 	_ = os.MkdirAll(config.DATA_DIR+"/"+date, 0775)
-	if this.util.IsExist(logFileName) {
+	if s.util.IsExist(logFileName) {
 		_ = os.Remove(logFileName)
 	}
-	if this.util.IsExist(metaFileName) {
+	if s.util.IsExist(metaFileName) {
 		_ = os.Remove(metaFileName)
 	}
 	fileLog, err = os.OpenFile(logFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0664)
@@ -124,7 +124,7 @@ func (this *server) BackUpMetaDataByDate(date string) {
 	defer fileMeta.Close()
 	keyPrefix = "%s_%s_"
 	keyPrefix = fmt.Sprintf(keyPrefix, date, config.CONST_FILE_Md5_FILE_NAME)
-	iter := this.logDB.NewIterator(util.BytesPrefix([]byte(keyPrefix)), nil)
+	iter := s.logDB.NewIterator(util.BytesPrefix([]byte(keyPrefix)), nil)
 	defer iter.Release()
 	for iter.Next() {
 		if err = json.Unmarshal(iter.Value(), &fileInfo); err != nil {
@@ -138,7 +138,7 @@ func (this *server) BackUpMetaDataByDate(date string) {
 		if _, err = fileMeta.WriteString(msg); err != nil {
 			_ = log.Error(err)
 		}
-		msg = fmt.Sprintf("%s\t%s\n", this.util.MD5(fileInfo.Path+"/"+name), string(iter.Value()))
+		msg = fmt.Sprintf("%s\t%s\n", s.util.MD5(fileInfo.Path+"/"+name), string(iter.Value()))
 		if _, err = fileMeta.WriteString(msg); err != nil {
 			_ = log.Error(err)
 		}

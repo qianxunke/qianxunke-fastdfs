@@ -12,7 +12,7 @@ import (
 	"runtime/debug"
 )
 
-func (this *server) RemoveKeyFromLevelDB(key string, db *leveldb.DB) error {
+func (s *server) RemoveKeyFromLevelDB(key string, db *leveldb.DB) error {
 	var (
 		err error
 	)
@@ -20,7 +20,7 @@ func (this *server) RemoveKeyFromLevelDB(key string, db *leveldb.DB) error {
 	return err
 }
 
-func (this *server) SaveFileInfoToLevelDB(key string, fileInfo *model.FileInfo, db *leveldb.DB) (*model.FileInfo, error) {
+func (s *server) SaveFileInfoToLevelDB(key string, fileInfo *model.FileInfo, db *leveldb.DB) (*model.FileInfo, error) {
 	var (
 		err  error
 		data []byte
@@ -33,26 +33,26 @@ func (this *server) SaveFileInfoToLevelDB(key string, fileInfo *model.FileInfo, 
 	if dao!=nil{
 		err = dao.UpdateFileInfo(fileInfo)
 	}
-	if db == this.ldb { //search slow ,write fast, double write logDB
-		logDate := this.util.GetDayFromTimeStamp(fileInfo.TimeStamp)
+	if db == s.ldb { //search slow ,write fast, double write logDB
+		logDate := s.util.GetDayFromTimeStamp(fileInfo.TimeStamp)
 		logKey := fmt.Sprintf("%s_%s_%s", logDate, config.CONST_FILE_Md5_FILE_NAME, fileInfo.Md5)
-		_ = this.logDB.Put([]byte(logKey), data, nil)
+		_ = s.logDB.Put([]byte(logKey), data, nil)
 	}
 	return fileInfo, nil
 }
 
 
-func (this *server) IsExistFromLevelDB(key string, db *leveldb.DB) (bool, error) {
+func (s *server) IsExistFromLevelDB(key string, db *leveldb.DB) (bool, error) {
 	return db.Has([]byte(key), nil)
 }
 
-func (this *server) GetFileInfoFromLevelDB(key string) (*model.FileInfo, error) {
+func (s *server) GetFileInfoFromLevelDB(key string) (*model.FileInfo, error) {
 	var (
 		err      error
 		data     []byte
 		fileInfo model.FileInfo
 	)
-	if data, err = this.ldb.Get([]byte(key), nil); err != nil {
+	if data, err = s.ldb.Get([]byte(key), nil); err != nil {
 		return nil, err
 	}
 	if err = json.Unmarshal(data, &fileInfo); err != nil {
@@ -61,7 +61,7 @@ func (this *server) GetFileInfoFromLevelDB(key string) (*model.FileInfo, error) 
 	return &fileInfo, nil
 }
 
-func (this *server) CleanLogLevelDBByDate(date string, filename string) {
+func (s *server) CleanLogLevelDBByDate(date string, filename string) {
 	defer func() {
 		if re := recover(); re != nil {
 			buffer := debug.Stack()
@@ -78,13 +78,13 @@ func (this *server) CleanLogLevelDBByDate(date string, filename string) {
 	keys = mapset.NewSet()
 	keyPrefix = "%s_%s_"
 	keyPrefix = fmt.Sprintf(keyPrefix, date, filename)
-	iter := this.logDB.NewIterator(util.BytesPrefix([]byte(keyPrefix)), nil)
+	iter := s.logDB.NewIterator(util.BytesPrefix([]byte(keyPrefix)), nil)
 	for iter.Next() {
 		keys.Add(string(iter.Value()))
 	}
 	iter.Release()
 	for key := range keys.Iter() {
-		err = this.RemoveKeyFromLevelDB(key.(string), this.logDB)
+		err = s.RemoveKeyFromLevelDB(key.(string), s.logDB)
 		if err != nil {
 			_ = log.Error(err)
 		}

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func (this *server) SendToMail(to, subject, body, mailtype string) error {
+func (s *server) SendToMail(to, subject, body, mailtype string) error {
 	host := config.Config().Mail.Host
 	user := config.Config().Mail.User
 	password := config.Config().Mail.Password

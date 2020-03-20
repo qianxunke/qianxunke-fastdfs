@@ -6,7 +6,7 @@ import (
 	"qianxunke-fastdfs/modules/file/service"
 )
 
-func Init()  {
+func Run()  {
 	model.Init()
 	service.Init()
 	handler.Init()

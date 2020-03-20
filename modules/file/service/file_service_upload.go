@@ -23,16 +23,16 @@ type ResponseEntity struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
-func (this *server) ConsumerUpload() {
+func (s *server) ConsumerUpload() {
 	ConsumerFunc := func() {
 		for {
-			wr := <-this.queueUpload
-			this.upload(*wr.W, wr.R)
-			this.rtMap.AddCountInt64(config.CONST_UPLOAD_COUNTER_KEY, wr.R.ContentLength)
-			if v, ok := this.rtMap.GetValue(config.CONST_UPLOAD_COUNTER_KEY); ok {
+			wr := <-s.queueUpload
+			s.upload(*wr.W, wr.R)
+			s.rtMap.AddCountInt64(config.CONST_UPLOAD_COUNTER_KEY, wr.R.ContentLength)
+			if v, ok := s.rtMap.GetValue(config.CONST_UPLOAD_COUNTER_KEY); ok {
 				if v.(int64) > 1*1024*1024*1024 {
 					var _v int64
-					this.rtMap.Put(config.CONST_UPLOAD_COUNTER_KEY, _v)
+					s.rtMap.Put(config.CONST_UPLOAD_COUNTER_KEY, _v)
 					debug.FreeOSMemory()
 				}
 			}
@@ -44,7 +44,7 @@ func (this *server) ConsumerUpload() {
 	}
 }
 
-func (this *server) upload(w http.ResponseWriter, r *http.Request) {
+func (s *server) upload(w http.ResponseWriter, r *http.Request) {
 	var (
 		err          error
 		md5sum       string
@@ -58,16 +58,16 @@ func (this *server) upload(w http.ResponseWriter, r *http.Request) {
 	)
 	output = r.FormValue("output")
 	if config.Config().EnableCrossOrigin {
-		this.CrossOrigin(w, r)
+		s.CrossOrigin(w, r)
 		if r.Method == http.MethodOptions {
 			return
 		}
 	}
 
 	if config.Config().AuthUrl != "" {
-		if !this.CheckAuth(w, r) {
+		if !s.CheckAuth(w, r) {
 			_ = log.Warn("auth fail", r.Form)
-			this.NotPermit(w, r)
+			s.NotPermit(w, r)
 			_, _ = w.Write([]byte("auth fail"))
 			return
 		}
@@ -104,23 +104,23 @@ func (this *server) upload(w http.ResponseWriter, r *http.Request) {
 		if output == "" {
 			output = "text"
 		}
-		if !this.util.Contains(output, []string{"json", "text","standard"}) {
+		if !s.util.Contains(output, []string{"json", "text","standard"}) {
 			_, _ = w.Write([]byte("output just support json or text or standard"))
 			return
 		}
 		fileInfo.Scene = scene
-		if _, err = this.CheckScene(scene); err != nil {
+		if _, err = s.CheckScene(scene); err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
 		}
-		if _, err = this.SaveUploadFile(uploadFile, uploadHeader, &fileInfo, r); err != nil {
+		if _, err = s.SaveUploadFile(uploadFile, uploadHeader, &fileInfo, r); err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
 		}
 		//去重
 		if config.Config().EnableDistinctFile {
-			if v, _ := this.GetFileInfoFromLevelDB(fileInfo.Md5); v != nil && v.Md5 != "" {
-				fileResult = this.BuildFileResult(v, r)
+			if v, _ := s.GetFileInfoFromLevelDB(fileInfo.Md5); v != nil && v.Md5 != "" {
+				fileResult = s.BuildFileResult(v, r)
 				if config.Config().RenameFile {
 					_ = os.Remove(config.DOCKER_DIR + fileInfo.Path + "/" + fileInfo.ReName)
 				} else {
@@ -155,23 +155,23 @@ func (this *server) upload(w http.ResponseWriter, r *http.Request) {
 		}
 		if !config.Config().EnableDistinctFile {
 			// bugfix filecount stat
-			fileInfo.Md5 = this.util.MD5(this.GetFilePathByInfo(&fileInfo, false))
+			fileInfo.Md5 = s.util.MD5(s.GetFilePathByInfo(&fileInfo, false))
 		}
 		if config.Config().EnableMergeSmallFile && fileInfo.Size < config.CONST_SMALL_FILE_SIZE {
-			if err = this.SaveSmallFile(&fileInfo); err != nil {
+			if err = s.SaveSmallFile(&fileInfo); err != nil {
 				_ = log.Error(err)
 				return
 			}
 		}
-		this.saveFileMd5Log(&fileInfo, config.CONST_FILE_Md5_FILE_NAME) //maybe slow
+		s.saveFileMd5Log(&fileInfo, config.CONST_FILE_Md5_FILE_NAME) //maybe slow
 		//集群同步
-		go this.postFileToPeer(&fileInfo)
+		go s.postFileToPeer(&fileInfo)
 
 		if fileInfo.Size <= 0 {
 			_ = log.Error("file size is zero")
 			return
 		}
-		fileResult = this.BuildFileResult(&fileInfo, r)
+		fileResult = s.BuildFileResult(&fileInfo, r)
 		if output == "json" {
 			if data, err = json.Marshal(fileResult); err != nil {
 				_ = log.Error(err)
@@ -197,8 +197,8 @@ func (this *server) upload(w http.ResponseWriter, r *http.Request) {
 				",and if you want to upload file,you must use post method  "))
 			return
 		}
-		if v, _ := this.GetFileInfoFromLevelDB(md5sum); v != nil && v.Md5 != "" {
-			fileResult = this.BuildFileResult(v, r)
+		if v, _ := s.GetFileInfoFromLevelDB(md5sum); v != nil && v.Md5 != "" {
+			fileResult = s.BuildFileResult(v, r)
 		}
 		if output == "json" {
 			if data, err = json.Marshal(fileResult); err != nil {
@@ -219,7 +219,7 @@ func (this *server) upload(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (this *server) SaveSmallFile(fileInfo *model.FileInfo) error {
+func (s *server) SaveSmallFile(fileInfo *model.FileInfo) error {
 	var (
 		err      error
 		filename string
@@ -238,14 +238,14 @@ func (this *server) SaveSmallFile(fileInfo *model.FileInfo) error {
 	}
 	fpath = config.DOCKER_DIR + fileInfo.Path + "/" + filename
 	largeDir = config.LARGE_DIR + "/" + config.Config().PeerId
-	if !this.util.FileExists(largeDir) {
+	if !s.util.FileExists(largeDir) {
 		_ = os.MkdirAll(largeDir, 0775)
 	}
-	reName = fmt.Sprintf("%d", this.util.RandInt(100, 300))
+	reName = fmt.Sprintf("%d", s.util.RandInt(100, 300))
 	destPath = largeDir + "/" + reName
-	this.lockMap.LockKey(destPath)
-	defer this.lockMap.UnLockKey(destPath)
-	if this.util.FileExists(fpath) {
+	s.lockMap.LockKey(destPath)
+	defer s.lockMap.UnLockKey(destPath)
+	if s.util.FileExists(fpath) {
 		srcFile, err = os.OpenFile(fpath, os.O_CREATE|os.O_RDONLY, 06666)
 		if err != nil {
 			return err
@@ -278,7 +278,7 @@ func (this *server) SaveSmallFile(fileInfo *model.FileInfo) error {
 	return nil
 }
 
-func (this *server) SaveUploadFile(file multipart.File, header *multipart.FileHeader, fileInfo *model.FileInfo, r *http.Request) (*model.FileInfo, error) {
+func (s *server) SaveUploadFile(file multipart.File, header *multipart.FileHeader, fileInfo *model.FileInfo, r *http.Request) (*model.FileInfo, error) {
 	var (
 		err     error
 		outFile *os.File
@@ -288,12 +288,12 @@ func (this *server) SaveUploadFile(file multipart.File, header *multipart.FileHe
 	defer file.Close()
 	_, fileInfo.Name = filepath.Split(header.Filename)
 	// bugfix for ie upload file contain fullpath
-	if len(config.Config().Extensions) > 0 && !this.util.Contains(path.Ext(fileInfo.Name), config.Config().Extensions) {
+	if len(config.Config().Extensions) > 0 && !s.util.Contains(path.Ext(fileInfo.Name), config.Config().Extensions) {
 		return fileInfo, errors.New("(error)file extension mismatch")
 	}
 
 	if config.Config().RenameFile {
-		fileInfo.ReName = this.util.MD5(this.util.GetUUID()) + path.Ext(fileInfo.Name)
+		fileInfo.ReName = s.util.MD5(s.util.GetUUID()) + path.Ext(fileInfo.Name)
 	}
 	folder = time.Now().Format("20060102/15/04")
 	if config.Config().PeerId != "" {
@@ -311,7 +311,7 @@ func (this *server) SaveUploadFile(file multipart.File, header *multipart.FileHe
 			folder = config.STORE_DIR + "/" + fileInfo.Path
 		}
 	}
-	if !this.util.FileExists(folder) {
+	if !s.util.FileExists(folder) {
 		_ = os.MkdirAll(folder, 0775)
 	}
 	outPath := fmt.Sprintf(folder+"/%s", fileInfo.Name)
@@ -319,11 +319,11 @@ func (this *server) SaveUploadFile(file multipart.File, header *multipart.FileHe
 		outPath = fmt.Sprintf(folder+"/%s", fileInfo.ReName)
 	}
     //避免用户自定义路径造成文件覆盖
-	if this.util.FileExists(outPath) && config.Config().EnableDistinctFile {
+	if s.util.FileExists(outPath) && config.Config().EnableDistinctFile {
 		for i := 0; i < 1000; i++ {
 			outPath = fmt.Sprintf(folder+"/%d_%s", i, filepath.Base(header.Filename))
 			fileInfo.Name = fmt.Sprintf("%d_%s", i, header.Filename)
-			if !this.util.FileExists(outPath) {
+			if !s.util.FileExists(outPath) {
 				break
 			}
 		}
@@ -350,17 +350,17 @@ func (this *server) SaveUploadFile(file multipart.File, header *multipart.FileHe
 	}
 	v := "" // this.util.GetFileSum(outFile, Config().FileSumArithmetic)
 	if config.Config().EnableDistinctFile {
-		v = this.util.GetFileSum(outFile, config.Config().FileSumArithmetic)
+		v = s.util.GetFileSum(outFile, config.Config().FileSumArithmetic)
 	} else {
-		v = this.util.MD5(this.GetFilePathByInfo(fileInfo, false))
+		v = s.util.MD5(s.GetFilePathByInfo(fileInfo, false))
 	}
 	fileInfo.Md5 = v
 	//fileInfo.Path = folder //strings.Replace( folder,DOCKER_DIR,"",1)
 	fileInfo.Path = strings.Replace(folder, config.DOCKER_DIR, "", 1)
 	if len(fileInfo.PeerStr)<=0{
-		fileInfo.PeerStr=this.host
+		fileInfo.PeerStr= s.host
 	}else {
-		fileInfo.PeerStr +=","+this.host
+		fileInfo.PeerStr +=","+ s.host
 	}
 
 	return fileInfo, nil

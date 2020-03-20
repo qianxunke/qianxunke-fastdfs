@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func (this *server) SyncFileInfo(w http.ResponseWriter, r *http.Request) {
+func (s *server) SyncFileInfo(w http.ResponseWriter, r *http.Request) {
 	var (
 		err         error
 		fileInfo    model.FileInfo
@@ -17,22 +17,22 @@ func (this *server) SyncFileInfo(w http.ResponseWriter, r *http.Request) {
 		filename    string
 	)
 	_ = r.ParseForm()
-	if !this.IsPeer(r) {
+	if !s.IsPeer(r) {
 		return
 	}
 	fileInfoStr = r.FormValue("fileInfo")
 	if err = json.Unmarshal([]byte(fileInfoStr), &fileInfo); err != nil {
-		_, _ = w.Write([]byte(this.GetClusterNotPermitMessage(r)))
+		_, _ = w.Write([]byte(s.GetClusterNotPermitMessage(r)))
 		_ = log.Error(err)
 		return
 	}
 	if fileInfo.OffSet == -2 {
 		// optimize migrate
-		_, _ = this.SaveFileInfoToLevelDB(fileInfo.Md5, &fileInfo, this.ldb)
+		_, _ = s.SaveFileInfoToLevelDB(fileInfo.Md5, &fileInfo, s.ldb)
 	} else {
-		this.SaveFileMd5Log(&fileInfo, config.CONST_Md5_QUEUE_FILE_NAME)
+		s.SaveFileMd5Log(&fileInfo, config.CONST_Md5_QUEUE_FILE_NAME)
 	}
-	this.AppendToDownloadQueue(&fileInfo)
+	s.AppendToDownloadQueue(&fileInfo)
 	filename = fileInfo.Name
 	if fileInfo.ReName != "" {
 		filename = fileInfo.ReName

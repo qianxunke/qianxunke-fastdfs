@@ -17,8 +17,6 @@ var (
 	lock         sync.Mutex
 )
 
-
-
 type DB struct {
 	Master DBConfigInfo `json:"master"`
 	Slave  DBConfigInfo `json:"slave"`
@@ -37,7 +35,6 @@ type DBConfigInfo struct {
 	MaxOpenConns int    `json:"maxOpenConns"`
 	MaxIdleConns int    `json:"maxIdleConns"`
 }
-
 
 //配置数据库主库
 func MasterEngine() *gorm.DB {
@@ -94,7 +91,8 @@ EXIST:
 }
 
 func createEngine(dbIndo DBConfigInfo, isMaster bool) {
-	if(dbIndo.Dialect=="mysql") {
+	//如果使用mysql
+	if dbIndo.Dialect == "mysql" {
 		engine, err := gorm.Open(dbIndo.Dialect, GetConnURL(&dbIndo))
 		if err != nil {
 			log.Printf("@@@ 初始化数据库连接失败!! %s", err)
@@ -113,8 +111,8 @@ func createEngine(dbIndo DBConfigInfo, isMaster bool) {
 		} else {
 			slaveEngine = engine
 		}
-	}else {
-		engine, err := gorm.Open("sqlite3", CONST_SQLLITE_NAME)
+	} else {
+		engine, err := gorm.Open(dbIndo.Dialect, CONST_SQLLITE_NAME)
 		if err != nil {
 			log.Printf("@@@ 初始化数据库连接失败!! %s", err)
 			return

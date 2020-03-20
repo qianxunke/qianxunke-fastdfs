@@ -6,7 +6,7 @@ import (
 	"qianxunke-fastdfs/common/api"
 )
 
-func (this *dao) InsertFileInfo(fileInfo *FileInfo) (err error) {
+func (d *dao) InsertFileInfo(fileInfo *FileInfo) (err error) {
 	defer func() {
 		if re := recover(); re != nil {
 			if err == nil {
@@ -26,7 +26,7 @@ func (this *dao) InsertFileInfo(fileInfo *FileInfo) (err error) {
 	return
 }
 
-func (this *dao) UpdateFileInfo(fileInfo *FileInfo) (err error) {
+func (d *dao) UpdateFileInfo(fileInfo *FileInfo) (err error) {
 	defer func() {
 		if re := recover(); re != nil {
 			if err == nil {
@@ -46,7 +46,7 @@ func (this *dao) UpdateFileInfo(fileInfo *FileInfo) (err error) {
 	return
 }
 
-func (this *dao) DeleteFileInfoById(id uint) (err error) {
+func (d *dao) DeleteFileInfoById(id uint) (err error) {
 	defer func() {
 		if re := recover(); re != nil {
 			if err == nil {
@@ -60,7 +60,7 @@ func (this *dao) DeleteFileInfoById(id uint) (err error) {
 
 }
 
-func (this *dao) SearchFileInfoList(limit int64, pages int64, key string, startTime string, endTime string, order string) (data *api.ListResponseEntity, err error) {
+func (d *dao) SearchFileInfoList(limit int64, pages int64, key string, startTime string, endTime string, order string) (data *api.ListResponseEntity, err error) {
 	defer func() {
 		if re := recover(); re != nil {
 			if err == nil {

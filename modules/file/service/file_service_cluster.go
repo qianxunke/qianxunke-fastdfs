@@ -16,7 +16,10 @@ import (
 )
 
 //集群数据同步
-func (this *server) postFileToPeer(fileInfo *model.FileInfo) {
+/**
+
+ */
+func (s *server) postFileToPeer(fileInfo *model.FileInfo) {
 	var (
 		err      error
 		peer     string
@@ -51,7 +54,7 @@ func (this *server) postFileToPeer(fileInfo *model.FileInfo) {
 			}
 		}
 		fpath = config.DOCKER_DIR + fileInfo.Path + "/" + filename
-		if !this.util.FileExists(fpath) {
+		if !s.util.FileExists(fpath) {
 			_ = log.Warn(fmt.Sprintf("file '%s' not found", fpath))
 			continue
 		} else {
@@ -66,19 +69,19 @@ func (this *server) postFileToPeer(fileInfo *model.FileInfo) {
 		if fileInfo.OffSet != -2 && config.Config().EnableDistinctFile {
 			//not migrate file should check or update file
 			// where not EnableDistinctFile should check
-			if info, err = this.checkPeerFileExist(peer, fileInfo.Md5, ""); info.Md5 != "" {
+			if info, err = s.checkPeerFileExist(peer, fileInfo.Md5, ""); info.Md5 != "" {
 				if len(fileInfo.PeerStr)>0{
 					fileInfo.PeerStr+=","+peer
 				}else {
 					fileInfo.PeerStr=peer
 				}
-				if _, err = this.SaveFileInfoToLevelDB(fileInfo.Md5, fileInfo, this.ldb); err != nil {
+				if _, err = s.SaveFileInfoToLevelDB(fileInfo.Md5, fileInfo, s.ldb); err != nil {
 					_ = log.Error(err)
 				}
 				continue
 			}
 		}
-		postURL = fmt.Sprintf("%s%s", peer, this.getRequestURI("syncfile_info"))
+		postURL = fmt.Sprintf("%s%s", peer, s.getRequestURI("syncfile_info"))
 		b := httplib.Post(postURL)
 		b.SetTimeout(time.Second*30, time.Second*30)
 		if data, err = json.Marshal(fileInfo); err != nil {
@@ -90,7 +93,7 @@ func (this *server) postFileToPeer(fileInfo *model.FileInfo) {
 		if err != nil {
 			if fileInfo.Retry <= config.Config().RetryCount {
 				fileInfo.Retry = fileInfo.Retry + 1
-				this.PeerAppendToQueue(fileInfo)
+				s.PeerAppendToQueue(fileInfo)
 			}
 			_ = log.Error(err, fmt.Sprintf(" path:%s", fileInfo.Path+"/"+fileInfo.Name))
 		}
@@ -106,7 +109,7 @@ func (this *server) postFileToPeer(fileInfo *model.FileInfo) {
 				}else {
 					fileInfo.PeerStr+=","+peer
 				}
-				if _, err = this.SaveFileInfoToLevelDB(fileInfo.Md5, fileInfo, this.ldb); err != nil {
+				if _, err = s.SaveFileInfoToLevelDB(fileInfo.Md5, fileInfo, s.ldb); err != nil {
 					_ = log.Error(err)
 				}
 			}
@@ -117,7 +120,7 @@ func (this *server) postFileToPeer(fileInfo *model.FileInfo) {
 	}
 }
 
-func (this *server) DownloadFromPeer(peer string, fileInfo *model.FileInfo) {
+func (s *server) DownloadFromPeer(peer string, fileInfo *model.FileInfo) {
 	var (
 		err         error
 		filename    string
@@ -142,21 +145,21 @@ func (this *server) DownloadFromPeer(peer string, fileInfo *model.FileInfo) {
 	if fileInfo.ReName != "" {
 		filename = fileInfo.ReName
 	}
-	if fileInfo.OffSet != -2 && config.Config().EnableDistinctFile && this.CheckFileExistByInfo(fileInfo.Md5, fileInfo) {
+	if fileInfo.OffSet != -2 && config.Config().EnableDistinctFile && s.CheckFileExistByInfo(fileInfo.Md5, fileInfo) {
 		// ignore migrate file
 		log.Info(fmt.Sprintf("DownloadFromPeer file Exist, path:%s", fileInfo.Path+"/"+fileInfo.Name))
 		return
 	}
-	if (!config.Config().EnableDistinctFile || fileInfo.OffSet == -2) && this.util.FileExists(this.GetFilePathByInfo(fileInfo, true)) {
+	if (!config.Config().EnableDistinctFile || fileInfo.OffSet == -2) && s.util.FileExists(s.GetFilePathByInfo(fileInfo, true)) {
 		// ignore migrate file
-		if fi, err = os.Stat(this.GetFilePathByInfo(fileInfo, true)); err == nil {
+		if fi, err = os.Stat(s.GetFilePathByInfo(fileInfo, true)); err == nil {
 			if fi.ModTime().Unix() > fileInfo.TimeStamp {
-				log.Info(fmt.Sprintf("ignore file sync path:%s", this.GetFilePathByInfo(fileInfo, false)))
+				log.Info(fmt.Sprintf("ignore file sync path:%s", s.GetFilePathByInfo(fileInfo, false)))
 				fileInfo.TimeStamp = fi.ModTime().Unix()
-				this.postFileToPeer(fileInfo) // keep newer
+				s.postFileToPeer(fileInfo) // keep newer
 				return
 			}
-			os.Remove(this.GetFilePathByInfo(fileInfo, true))
+			os.Remove(s.GetFilePathByInfo(fileInfo, true))
 		}
 	}
 	if _, err = os.Stat(fileInfo.Path); err != nil {
@@ -173,32 +176,32 @@ func (this *server) DownloadFromPeer(peer string, fileInfo *model.FileInfo) {
 	if config.Config().SyncTimeout > 0 {
 		timeout = config.Config().SyncTimeout
 	}
-	this.lockMap.LockKey(fpath)
-	defer this.lockMap.UnLockKey(fpath)
+	s.lockMap.LockKey(fpath)
+	defer s.lockMap.UnLockKey(fpath)
 	download_key := fmt.Sprintf("downloading_%d_%s", time.Now().Unix(), fpath)
-	this.ldb.Put([]byte(download_key), []byte(""), nil)
+	s.ldb.Put([]byte(download_key), []byte(""), nil)
 	defer func() {
-		this.ldb.Delete([]byte(download_key), nil)
+		s.ldb.Delete([]byte(download_key), nil)
 	}()
 	if fileInfo.OffSet == -2 {
 		//migrate file
 		if fi, err = os.Stat(fpath); err == nil && fi.Size() == fileInfo.Size {
 			//prevent double download
-			this.SaveFileInfoToLevelDB(fileInfo.Md5, fileInfo, this.ldb)
+			s.SaveFileInfoToLevelDB(fileInfo.Md5, fileInfo, s.ldb)
 			//log.Info(fmt.Sprintf("file '%s' has download", fpath))
 			return
 		}
 		req := httplib.Get(downloadUrl)
 		req.SetTimeout(time.Second*30, time.Second*time.Duration(timeout))
 		if err = req.ToFile(fpathTmp); err != nil {
-			this.AppendToDownloadQueue(fileInfo) //retry
+			s.AppendToDownloadQueue(fileInfo) //retry
 			os.Remove(fpathTmp)
 			log.Error(err, fpathTmp)
 			return
 		}
 		if os.Rename(fpathTmp, fpath) == nil {
 			//this.SaveFileMd5Log(fileInfo, CONST_FILE_Md5_FILE_NAME)
-			this.SaveFileInfoToLevelDB(fileInfo.Md5, fileInfo, this.ldb)
+			s.SaveFileInfoToLevelDB(fileInfo.Md5, fileInfo, s.ldb)
 		}
 		return
 	}
@@ -208,7 +211,7 @@ func (this *server) DownloadFromPeer(peer string, fileInfo *model.FileInfo) {
 		//small file download
 		data, err = req.Bytes()
 		if err != nil {
-			this.AppendToDownloadQueue(fileInfo) //retry
+			s.AppendToDownloadQueue(fileInfo) //retry
 			log.Error(err)
 			return
 		}
@@ -223,16 +226,16 @@ func (this *server) DownloadFromPeer(peer string, fileInfo *model.FileInfo) {
 			return
 		}
 		fpath = strings.Split(fpath, ",")[0]
-		err = this.util.WriteFileByOffSet(fpath, fileInfo.OffSet, data)
+		err = s.util.WriteFileByOffSet(fpath, fileInfo.OffSet, data)
 		if err != nil {
 			log.Warn(err)
 			return
 		}
-		this.SaveFileMd5Log(fileInfo, config.CONST_FILE_Md5_FILE_NAME)
+		s.SaveFileMd5Log(fileInfo, config.CONST_FILE_Md5_FILE_NAME)
 		return
 	}
 	if err = req.ToFile(fpathTmp); err != nil {
-		this.AppendToDownloadQueue(fileInfo) //retry
+		s.AppendToDownloadQueue(fileInfo) //retry
 		os.Remove(fpathTmp)
 		log.Error(err)
 		return
@@ -248,12 +251,12 @@ func (this *server) DownloadFromPeer(peer string, fileInfo *model.FileInfo) {
 		return
 	}
 	if os.Rename(fpathTmp, fpath) == nil {
-		this.SaveFileMd5Log(fileInfo, config.CONST_FILE_Md5_FILE_NAME)
+		s.SaveFileMd5Log(fileInfo, config.CONST_FILE_Md5_FILE_NAME)
 	}
 }
 
 
-func (this *server) CheckFileAndSendToPeer(date string, filename string, isForceUpload bool) {
+func (s *server) CheckFileAndSendToPeer(date string, filename string, isForceUpload bool) {
 	var (
 		md5set mapset.Set
 		err    error
@@ -267,7 +270,7 @@ func (this *server) CheckFileAndSendToPeer(date string, filename string, isForce
 			_ = log.Error(string(buffer))
 		}
 	}()
-	if md5set, err = this.GetMd5sByDate(date, filename); err != nil {
+	if md5set, err = s.GetMd5sByDate(date, filename); err != nil {
 		_ = log.Error(err)
 		return
 	}
@@ -276,7 +279,7 @@ func (this *server) CheckFileAndSendToPeer(date string, filename string, isForce
 		if md == nil {
 			continue
 		}
-		if fileInfo, _ := this.GetFileInfoFromLevelDB(md.(string)); fileInfo != nil && fileInfo.Md5 != "" {
+		if fileInfo, _ := s.GetFileInfoFromLevelDB(md.(string)); fileInfo != nil && fileInfo.Md5 != "" {
 			peers:=strings.Split(fileInfo.PeerStr,",")
 			if peers==nil{
 				peers=[]string{}
@@ -287,28 +290,28 @@ func (this *server) CheckFileAndSendToPeer(date string, filename string, isForce
 			if len(peers) > len(config.Config().Peers) {
 				continue
 			}
-			if !strings.Contains(fileInfo.PeerStr,this.host) {
+			if !strings.Contains(fileInfo.PeerStr, s.host) {
 				if len(fileInfo.PeerStr)>0{
-					fileInfo.PeerStr+=","+this.host
+					fileInfo.PeerStr+=","+ s.host
 				}else {
-					fileInfo.PeerStr=this.host
+					fileInfo.PeerStr= s.host
 				}
 			}
 			if filename == config.CONST_Md5_QUEUE_FILE_NAME {
-				this.AppendToDownloadQueue(fileInfo)
+				s.AppendToDownloadQueue(fileInfo)
 			} else {
-				this.PeerAppendToQueue(fileInfo)
+				s.PeerAppendToQueue(fileInfo)
 			}
 		}
 	}
 }
 
-func (this *server) checkPeerFileExist(peer string, md5sum string, fpath string) (*model.FileInfo, error) {
+func (s *server) checkPeerFileExist(peer string, md5sum string, fpath string) (*model.FileInfo, error) {
 	var (
 		err      error
 		fileInfo model.FileInfo
 	)
-	req := httplib.Post(fmt.Sprintf("%s%s?md5=%s", peer, this.getRequestURI("check_file_exist"), md5sum))
+	req := httplib.Post(fmt.Sprintf("%s%s?md5=%s", peer, s.getRequestURI("check_file_exist"), md5sum))
 	req.Param("path", fpath)
 	req.Param("md5", md5sum)
 	req.SetTimeout(time.Second*5, time.Second*10)
@@ -321,15 +324,15 @@ func (this *server) checkPeerFileExist(peer string, md5sum string, fpath string)
 	return &fileInfo, nil
 }
 
-func (this *server) Sync(w http.ResponseWriter, r *http.Request) {
+func (s *server) Sync(w http.ResponseWriter, r *http.Request) {
 	var (
 		result model.JsonResult
 	)
 	_ = r.ParseForm()
 	result.Status = "fail"
-	if !this.IsPeer(r) {
+	if !s.IsPeer(r) {
 		result.Message = "client must be in cluster"
-		_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+		_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 		return
 	}
 	date := ""
@@ -344,7 +347,7 @@ func (this *server) Sync(w http.ResponseWriter, r *http.Request) {
 	}
 	if inner != "1" {
 		for _, peer := range config.Config().Peers {
-			req := httplib.Post(peer + this.getRequestURI("sync"))
+			req := httplib.Post(peer + s.getRequestURI("sync"))
 			req.Param("force", force)
 			req.Param("inner", "1")
 			req.Param("date", date)
@@ -355,37 +358,37 @@ func (this *server) Sync(w http.ResponseWriter, r *http.Request) {
 	}
 	if date == "" {
 		result.Message = "require paramete date &force , ?date=20181230"
-		_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+		_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 		return
 	}
 	date = strings.Replace(date, ".", "", -1)
 	if isForceUpload {
-		go this.CheckFileAndSendToPeer(date, config.CONST_FILE_Md5_FILE_NAME, isForceUpload)
+		go s.CheckFileAndSendToPeer(date, config.CONST_FILE_Md5_FILE_NAME, isForceUpload)
 	} else {
-		go this.CheckFileAndSendToPeer(date, config.CONST_Md5_ERROR_FILE_NAME, isForceUpload)
+		go s.CheckFileAndSendToPeer(date, config.CONST_Md5_ERROR_FILE_NAME, isForceUpload)
 	}
 	result.Status = "ok"
 	result.Message = "job is running"
-	_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+	_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 }
 
 
-func (this *server) IsPeer(r *http.Request) bool {
+func (s *server) IsPeer(r *http.Request) bool {
 	var (
 		ip    string
 		peer  string
 		bflag bool
 	)
 	//return true
-	ip = this.util.GetClientIp(r)
+	ip = s.util.GetClientIp(r)
 	realIp := os.Getenv("GO_FASTDFS_IP")
 	if realIp == "" {
-		realIp = this.util.GetPulicIP()
+		realIp = s.util.GetPulicIP()
 	}
 	if ip == "127.0.0.1" || ip == realIp {
 		return true
 	}
-	if this.util.Contains(ip, config.Config().AdminIps) {
+	if s.util.Contains(ip, config.Config().AdminIps) {
 		return true
 	}
 	ip = "http://" + ip
@@ -400,11 +403,11 @@ func (this *server) IsPeer(r *http.Request) bool {
 }
 
 
-func (this *server) ConsumerPostToPeer() {
+func (s *server) ConsumerPostToPeer() {
 	ConsumerFunc := func() {
 		for {
-			fileInfo := <-this.queueToPeers
-			this.postFileToPeer(&fileInfo)
+			fileInfo := <-s.queueToPeers
+			s.postFileToPeer(&fileInfo)
 		}
 	}
 	for i := 0; i < config.Config().SyncWorker; i++ {
@@ -412,18 +415,18 @@ func (this *server) ConsumerPostToPeer() {
 	}
 }
 
-func (this *server) LoadQueueSendToPeer() {
-	if queue, err := this.LoadFileInfoByDate(this.util.GetToDay(), config.CONST_Md5_QUEUE_FILE_NAME); err != nil {
+func (s *server) LoadQueueSendToPeer() {
+	if queue, err := s.LoadFileInfoByDate(s.util.GetToDay(), config.CONST_Md5_QUEUE_FILE_NAME); err != nil {
 		_=log.Error(err)
 	} else {
 		for fileInfo := range queue.Iter() {
 			//this.queueFromPeers <- *fileInfo.(*FileInfo)
-			this.AppendToDownloadQueue(fileInfo.(*model.FileInfo))
+			s.AppendToDownloadQueue(fileInfo.(*model.FileInfo))
 		}
 	}
 }
 
-func (this *server) CheckClusterStatus() {
+func (s *server) CheckClusterStatus() {
 	check := func() {
 		defer func() {
 			if re := recover(); re != nil {
@@ -441,7 +444,7 @@ func (this *server) CheckClusterStatus() {
 			req     *httplib.BeegoHTTPRequest
 		)
 		for _, peer := range config.Config().Peers {
-			req = httplib.Get(fmt.Sprintf("%s%s", peer, this.getRequestURI("status")))
+			req = httplib.Get(fmt.Sprintf("%s%s", peer, s.getRequestURI("status")))
 			req.SetTimeout(time.Second*5, time.Second*5)
 			err = req.ToJSON(&status)
 			if err != nil || status.Status != "ok" {
@@ -452,7 +455,7 @@ func (this *server) CheckClusterStatus() {
 					} else {
 						body = fmt.Sprintf("%s\nserver:%s\n", subject, peer)
 					}
-					if err = this.SendToMail(to, subject, body, "text"); err != nil {
+					if err = s.SendToMail(to, subject, body, "text"); err != nil {
 						log.Error(err)
 					}
 				}
@@ -477,17 +480,17 @@ func (this *server) CheckClusterStatus() {
 }
 
 
-func (this *server) PeerAppendToQueue(fileInfo *model.FileInfo) {
+func (s *server) PeerAppendToQueue(fileInfo *model.FileInfo) {
 
-	for (len(this.queueToPeers) + CONST_QUEUE_SIZE/10) > CONST_QUEUE_SIZE {
+	for (len(s.queueToPeers) + CONST_QUEUE_SIZE/10) > CONST_QUEUE_SIZE {
 		time.Sleep(time.Millisecond * 50)
 	}
-	this.queueToPeers <- *fileInfo
+	s.queueToPeers <- *fileInfo
 }
 
-func (this *server) AppendToDownloadQueue(fileInfo *model.FileInfo) {
-	for (len(this.queueFromPeers) + CONST_QUEUE_SIZE/10) > CONST_QUEUE_SIZE {
+func (s *server) AppendToDownloadQueue(fileInfo *model.FileInfo) {
+	for (len(s.queueFromPeers) + CONST_QUEUE_SIZE/10) > CONST_QUEUE_SIZE {
 		time.Sleep(time.Millisecond * 50)
 	}
-	this.queueFromPeers <- *fileInfo
+	s.queueFromPeers <- *fileInfo
 }

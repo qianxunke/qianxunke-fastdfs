@@ -37,7 +37,7 @@ func HandlerRegister() {
 		http.HandleFunc(fmt.Sprintf("%s/%s", groupRoute, uploadPage), server.Index)
 	}
 	http.HandleFunc(fmt.Sprintf("%s/check_files_exist", groupRoute), server.CheckFilesExist)
-		http.HandleFunc(fmt.Sprintf("%s/check_file_exist", groupRoute), server.CheckFileExist)
+	http.HandleFunc(fmt.Sprintf("%s/check_file_exist", groupRoute), server.CheckFileExist)
 	http.HandleFunc(fmt.Sprintf("%s/upload", groupRoute), server.Upload)
 	http.HandleFunc(fmt.Sprintf("%s/delete", groupRoute), server.RemoveFile)
 	http.HandleFunc(fmt.Sprintf("%s/get_file_info", groupRoute), server.GetFileInfo)
@@ -56,8 +56,6 @@ func HandlerRegister() {
 	http.HandleFunc(fmt.Sprintf("%s/syncfile_info", groupRoute), server.SyncFileInfo)
 	http.HandleFunc(fmt.Sprintf("%s/get_md5s_by_date", groupRoute), server.GetMd5sForWeb)
 	http.HandleFunc(fmt.Sprintf("%s/receive_md5s", groupRoute), server.ReceiveMd5s)
-	//	http.HandleFunc(fmt.Sprintf("%s/gen_google_secret", groupRoute), server.GenGoogleSecret)
-	//	http.HandleFunc(fmt.Sprintf("%s/gen_google_code", groupRoute), server.GenGoogleCode)
 	http.HandleFunc("/"+config.Config().Group+"/", server.Download)
 	fmt.Println("Listen on " + config.Config().Addr)
 	srv := &http.Server{
@@ -70,8 +68,6 @@ func HandlerRegister() {
 	}
 	err := srv.ListenAndServe()
 	log.Println(err)
-	fmt.Println(err)
-
 }
 
 type HttpHandler struct {
@@ -111,5 +107,4 @@ func CrossOrigin(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Depth, User-Agent, X-File-Size, X-Requested-With, X-Requested-By, If-Modified-Since, X-File-Name, X-File-Type, Cache-Control, Origin")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
 	w.Header().Set("Access-Control-Expose-Headers", "Authorization")
-	//https://blog.csdn.net/yanzisu_congcong/article/details/80552155
 }

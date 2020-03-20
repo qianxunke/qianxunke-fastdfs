@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-func (this *server) WatchfileschangeJob() {
+func (s *server) WatchfileschangeJob() {
 	var (
 		w        *watcher.Watcher
 		fileInfo model.FileInfo
@@ -46,14 +46,14 @@ func (this *server) WatchfileschangeJob() {
 					fpath = strings.Replace(event.Path, curDir, config.STORE_DIR_NAME, 1)
 				}
 				fpath = strings.Replace(fpath, string(os.PathSeparator), "/", -1)
-				sum := this.util.MD5(fpath)
+				sum := s.util.MD5(fpath)
 				fileInfo = model.FileInfo{
 					Size:      event.Size(),
 					Name:      event.Name(),
 					Path:      strings.TrimSuffix(fpath, "/"+event.Name()), // files/default/20190927/xxx
 					Md5:       sum,
 					TimeStamp: event.ModTime().Unix(),
-					PeerStr:   this.host,
+					PeerStr:   s.host,
 					OffSet:    -2,
 					Op:        event.Op.String(),
 				}
@@ -77,8 +77,8 @@ func (this *server) WatchfileschangeJob() {
 			} else {
 				if c.Op == watcher.Create.String() {
 					log.Info(fmt.Sprintf("Syncfile Add to Queue path:%s", fileInfo.Path+"/"+fileInfo.Name))
-					this.PeerAppendToQueue(c)
-					_, _ = this.SaveFileInfoToLevelDB(c.Md5, c, this.ldb)
+					s.PeerAppendToQueue(c)
+					_, _ = s.SaveFileInfoToLevelDB(c.Md5, c, s.ldb)
 				}
 			}
 		}
@@ -107,7 +107,7 @@ func (this *server) WatchfileschangeJob() {
 }
 
 
-func (this *server) Reload(w http.ResponseWriter, r *http.Request) {
+func (s *server) Reload(w http.ResponseWriter, r *http.Request) {
 	var (
 		err     error
 		data    []byte
@@ -118,8 +118,8 @@ func (this *server) Reload(w http.ResponseWriter, r *http.Request) {
 	)
 	result.Status = "fail"
 	_ = r.ParseForm()
-	if !this.IsPeer(r) {
-		_, _ = w.Write([]byte(this.GetClusterNotPermitMessage(r)))
+	if !s.IsPeer(r) {
+		_, _ = w.Write([]byte(s.GetClusterNotPermitMessage(r)))
 		return
 	}
 	cfgjson = r.FormValue("cfg")
@@ -128,42 +128,42 @@ func (this *server) Reload(w http.ResponseWriter, r *http.Request) {
 	if action == "get" {
 		result.Data = config.Config()
 		result.Status = "ok"
-		_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+		_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 		return
 	}
 	if action == "set" {
 		if cfgjson == "" {
 			result.Message = "(error)parameter cfg(json) require"
-			_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+			_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 			return
 		}
 		if err = json.Unmarshal([]byte(cfgjson), &cfg); err != nil {
 			_ = log.Error(err)
 			result.Message = err.Error()
-			_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+			_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 			return
 		}
 		result.Status = "ok"
-		cfgjson = this.util.JsonEncodePretty(cfg)
-		this.util.WriteFile(config.CONST_CONF_FILE_NAME, cfgjson)
-		_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+		cfgjson = s.util.JsonEncodePretty(cfg)
+		s.util.WriteFile(config.CONST_CONF_FILE_NAME, cfgjson)
+		_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 		return
 	}
 	if action == "reload" {
 		if data, err = ioutil.ReadFile(config.CONST_CONF_FILE_NAME); err != nil {
 			result.Message = err.Error()
-			_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+			_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 			return
 		}
 		if err = json.Unmarshal(data, &cfg); err != nil {
 			result.Message = err.Error()
-			_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+			_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 			return
 		}
 		config.ParseConfig(config.CONST_CONF_FILE_NAME)
-		this.initComponent(true)
+		s.initComponent(true)
 		result.Status = "ok"
-		_, _ = w.Write([]byte(this.util.JsonEncodePretty(result)))
+		_, _ = w.Write([]byte(s.util.JsonEncodePretty(result)))
 		return
 	}
 	if action == "" {
@@ -173,30 +173,30 @@ func (this *server) Reload(w http.ResponseWriter, r *http.Request) {
 
 
 
-func (this *server) initComponent(isReload bool) {
+func (s *server) initComponent(isReload bool) {
 	var (
 		ip string
 	)
 	if ip = os.Getenv("GO_FASTDFS_IP"); ip == "" {
-		ip = this.util.GetPulicIP()
+		ip = s.util.GetPulicIP()
 	}
 	if config.Config().Host == "" {
 		if len(strings.Split(config.Config().Addr, ":")) == 2 {
-			this.host = fmt.Sprintf("http://%s:%s", ip, strings.Split(config.Config().Addr, ":")[1])
-			config.Config().Host = this.host
+			s.host = fmt.Sprintf("http://%s:%s", ip, strings.Split(config.Config().Addr, ":")[1])
+			config.Config().Host = s.host
 		}
 	} else {
 		if strings.HasPrefix(config.Config().Host, "http") {
-			this.host = config.Config().Host
+			s.host = config.Config().Host
 		} else {
-			this.host = "http://" + config.Config().Host
+			s.host = "http://" + config.Config().Host
 		}
 	}
 	ex, _ := regexp.Compile("\\d+\\.\\d+\\.\\d+\\.\\d+")
 	var peers []string
 	for _, peer := range config.Config().Peers {
-		if this.util.Contains(ip, ex.FindAllString(peer, -1)) ||
-			this.util.Contains("127.0.0.1", ex.FindAllString(peer, -1)) {
+		if s.util.Contains(ip, ex.FindAllString(peer, -1)) ||
+			s.util.Contains("127.0.0.1", ex.FindAllString(peer, -1)) {
 			continue
 		}
 		if strings.HasPrefix(peer, "http") {
@@ -207,15 +207,15 @@ func (this *server) initComponent(isReload bool) {
 	}
 	config.Config().Peers = peers
 	if !isReload {
-		this.FormatStatInfo()
+		s.FormatStatInfo()
 		if config.Config().EnableTus {
-			this.initTus()
+			s.initTus()
 		}
 	}
 	for _, s := range config.Config().Scenes {
 		kv := strings.Split(s, ":")
 		if len(kv) == 2 {
-			this.sceneMap.Put(kv[0], kv[1])
+			s.sceneMap.Put(kv[0], kv[1])
 		}
 	}
 	if config.Config().ReadTimeout == 0 {

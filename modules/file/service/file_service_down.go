@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func (this *server) DownloadSmallFileByURI(w http.ResponseWriter, r *http.Request) (bool, error) {
+func (s *server) DownloadSmallFileByURI(w http.ResponseWriter, r *http.Request) (bool, error) {
 	var (
 		err        error
 		data       []byte
@@ -48,14 +48,14 @@ func (this *server) DownloadSmallFileByURI(w http.ResponseWriter, r *http.Reques
 			log.Error(err)
 		}
 	}
-	data, notFound, err = this.GetSmallFileByURI(w, r)
+	data, notFound, err = s.GetSmallFileByURI(w, r)
 	_ = notFound
 	if data != nil && string(data[0]) == "1" {
 		if isDownload {
-			this.SetDownloadHeader(w, r)
+			s.SetDownloadHeader(w, r)
 		}
 		if imgWidth != 0 || imgHeight != 0 {
-			this.ResizeImageByBytes(w, data[1:], uint(imgWidth), uint(imgHeight))
+			s.ResizeImageByBytes(w, data[1:], uint(imgWidth), uint(imgHeight))
 			return true, nil
 		}
 		w.Write(data[1:])
@@ -64,7 +64,7 @@ func (this *server) DownloadSmallFileByURI(w http.ResponseWriter, r *http.Reques
 	return false, errors.New("not found")
 }
 
-func (this *server) DownloadNormalFileByURI(w http.ResponseWriter, r *http.Request) (bool, error) {
+func (s *server) DownloadNormalFileByURI(w http.ResponseWriter, r *http.Request) (bool, error) {
 	var (
 		err        error
 		isDownload bool
@@ -96,11 +96,11 @@ func (this *server) DownloadNormalFileByURI(w http.ResponseWriter, r *http.Reque
 		}
 	}
 	if isDownload {
-		this.SetDownloadHeader(w, r)
+		s.SetDownloadHeader(w, r)
 	}
-	fullpath, _ := this.GetFilePathFromRequest(w, r)
+	fullpath, _ := s.GetFilePathFromRequest(w, r)
 	if imgWidth != 0 || imgHeight != 0 {
-		this.ResizeImage(w, fullpath, uint(imgWidth), uint(imgHeight))
+		s.ResizeImage(w, fullpath, uint(imgWidth), uint(imgHeight))
 		return true, nil
 	}
 	staticHandler.ServeHTTP(w, r)
@@ -108,7 +108,7 @@ func (this *server) DownloadNormalFileByURI(w http.ResponseWriter, r *http.Reque
 }
 
 
-func (this *server) DownloadNotFound(w http.ResponseWriter, r *http.Request) {
+func (s *server) DownloadNotFound(w http.ResponseWriter, r *http.Request) {
 	var (
 		err        error
 		fullpath   string
@@ -118,7 +118,7 @@ func (this *server) DownloadNotFound(w http.ResponseWriter, r *http.Request) {
 		peer       string
 		fileInfo   *model.FileInfo
 	)
-	fullpath, smallPath = this.GetFilePathFromRequest(w, r)
+	fullpath, smallPath = s.GetFilePathFromRequest(w, r)
 	isDownload = true
 	if r.FormValue("download") == "" {
 		isDownload = config.Config().DefaultDownload
@@ -127,22 +127,22 @@ func (this *server) DownloadNotFound(w http.ResponseWriter, r *http.Request) {
 		isDownload = false
 	}
 	if smallPath != "" {
-		pathMd5 = this.util.MD5(smallPath)
+		pathMd5 = s.util.MD5(smallPath)
 	} else {
-		pathMd5 = this.util.MD5(fullpath)
+		pathMd5 = s.util.MD5(fullpath)
 	}
 	for _, peer = range config.Config().Peers {
-		if fileInfo, err = this.checkPeerFileExist(peer, pathMd5, fullpath); err != nil {
+		if fileInfo, err = s.checkPeerFileExist(peer, pathMd5, fullpath); err != nil {
 			_ = log.Error(err)
 			continue
 		}
 		if fileInfo.Md5 != "" {
-			go this.DownloadFromPeer(peer, fileInfo)
+			go s.DownloadFromPeer(peer, fileInfo)
 			//http.Redirect(w, r, peer+r.RequestURI, 302)
 			if isDownload {
-				this.SetDownloadHeader(w, r)
+				s.SetDownloadHeader(w, r)
 			}
-			this.DownloadFileToResponse(peer+r.RequestURI, w, r)
+			s.DownloadFileToResponse(peer+r.RequestURI, w, r)
 			return
 		}
 	}
@@ -150,7 +150,7 @@ func (this *server) DownloadNotFound(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (this *server) DownloadFileToResponse(url string, w http.ResponseWriter, r *http.Request) {
+func (s *server) DownloadFileToResponse(url string, w http.ResponseWriter, r *http.Request) {
 	var (
 		err  error
 		req  *httplib.BeegoHTTPRequest
@@ -169,10 +169,10 @@ func (this *server) DownloadFileToResponse(url string, w http.ResponseWriter, r 
 	}
 }
 
-func (this *server) ConsumerDownLoad() {
+func (s *server) ConsumerDownLoad() {
 	ConsumerFunc := func() {
 		for {
-			fileInfo := <-this.queueFromPeers
+			fileInfo := <-s.queueFromPeers
 			if len(fileInfo.PeerStr) <= 0 {
 				_ = log.Warn("Peer is null", fileInfo)
 				continue
@@ -183,8 +183,8 @@ func (this *server) ConsumerDownLoad() {
 					_ = log.Warn("sync error with 127.0.0.1", fileInfo)
 					continue
 				}
-				if peer != this.host {
-					this.DownloadFromPeer(peer, &fileInfo)
+				if peer != s.host {
+					s.DownloadFromPeer(peer, &fileInfo)
 					break
 				}
 			}
@@ -195,10 +195,10 @@ func (this *server) ConsumerDownLoad() {
 	}
 }
 
-func (this *server) RemoveDownloading() {
+func (s *server) RemoveDownloading() {
 	RemoveDownloadFunc := func() {
 		for {
-			iter := this.ldb.NewIterator(util.BytesPrefix([]byte("downloading_")), nil)
+			iter := s.ldb.NewIterator(util.BytesPrefix([]byte("downloading_")), nil)
 			for iter.Next() {
 				key := iter.Key()
 				keys := strings.Split(string(key), "_")

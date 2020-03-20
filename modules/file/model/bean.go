@@ -47,7 +47,6 @@ type FileResult struct {
 	Scene   string `json:"scene"`
 	Size    int64  `json:"size"`
 	ModTime int64  `json:"mtime"`
-	//Just for Compatibility
 	Scenes  string `json:"scenes"`
 	Retmsg  string `json:"retmsg"`
 	Retcode int    `json:"retcode"`

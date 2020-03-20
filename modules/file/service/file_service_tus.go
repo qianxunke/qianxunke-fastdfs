@@ -24,7 +24,7 @@ type hookDataStore struct {
 	tusd.DataStore
 }
 
-func (this *server) initTus() {
+func (s *server) initTus() {
 	var (
 		err     error
 		fileLog *os.File
@@ -47,7 +47,7 @@ func (this *server) initTus() {
 			} else {
 				if fi.Size() > 1024*1024*500 {
 					//500M
-					_, _ = this.util.CopyFile(config.LOG_DIR+"/tusd.log", config.LOG_DIR+"/tusd.log.2")
+					_, _ = s.util.CopyFile(config.LOG_DIR+"/tusd.log", config.LOG_DIR+"/tusd.log.2")
 					_, _ = fileLog.Seek(0, 0)
 					_ = fileLog.Truncate(0)
 					_, _ = fileLog.Seek(0, 2)
@@ -72,7 +72,7 @@ func (this *server) initTus() {
 			fi     *model.FileInfo
 			fn     string
 		)
-		if fi, err = this.GetFileInfoFromLevelDB(id); err != nil {
+		if fi, err = s.GetFileInfoFromLevelDB(id); err != nil {
 			_ = log.Error(err)
 			return nil, err
 		} else {
@@ -81,19 +81,19 @@ func (this *server) initTus() {
 				fn = fi.ReName
 			}
 			fp := config.DOCKER_DIR + fi.Path + "/" + fn
-			if this.util.FileExists(fp) {
+			if s.util.FileExists(fp) {
 				log.Info(fmt.Sprintf("download:%s", fp))
 				return os.Open(fp)
 			}
 			ps := strings.Split(fp, ",")
-			if len(ps) > 2 && this.util.FileExists(ps[0]) {
+			if len(ps) > 2 && s.util.FileExists(ps[0]) {
 				if length, err = strconv.Atoi(ps[2]); err != nil {
 					return nil, err
 				}
 				if offset, err = strconv.ParseInt(ps[1], 10, 64); err != nil {
 					return nil, err
 				}
-				if buffer, err = this.util.ReadFileByOffSet(ps[0], offset, length); err != nil {
+				if buffer, err = s.util.ReadFileByOffSet(ps[0], offset, length); err != nil {
 					return nil, err
 				}
 				if buffer[0] == '1' {
@@ -135,7 +135,7 @@ func (this *server) initTus() {
 				md5sum := ""
 				oldFullPath := BIG_DIR + "/" + info.ID + ".bin"
 				infoFullPath := BIG_DIR + "/" + info.ID + ".info"
-				if md5sum, err = this.util.GetFileSumByName(oldFullPath, config.Config().FileSumArithmetic); err != nil {
+				if md5sum, err = s.util.GetFileSumByName(oldFullPath, config.Config().FileSumArithmetic); err != nil {
 					_ = log.Error(err)
 					continue
 				}
@@ -144,11 +144,11 @@ func (this *server) initTus() {
 				timeStamp := time.Now().Unix()
 				fpath := time.Now().Format("/20060102/15/04/")
 				newFullPath := config.STORE_DIR + "/" + config.Config().DefaultScene + fpath + config.Config().PeerId + "/" + filename
-				if fi, err := this.GetFileInfoFromLevelDB(md5sum); err != nil {
+				if fi, err := s.GetFileInfoFromLevelDB(md5sum); err != nil {
 					_ = log.Error(err)
 				} else {
 					if fi.Md5 != "" {
-						if _, err := this.SaveFileInfoToLevelDB(info.ID, fi, this.ldb); err != nil {
+						if _, err := s.SaveFileInfoToLevelDB(info.ID, fi, s.ldb); err != nil {
 							_ = log.Error(err)
 						}
 						log.Info(fmt.Sprintf("file is found md5:%s", fi.Md5))
@@ -168,7 +168,7 @@ func (this *server) initTus() {
 					Size:      info.Size,
 					TimeStamp: timeStamp,
 					Md5:       md5sum,
-					PeerStr:   this.host,
+					PeerStr:   s.host,
 					OffSet:    -1,
 				}
 				if err = os.Rename(oldFullPath, newFullPath); err != nil {
@@ -177,17 +177,17 @@ func (this *server) initTus() {
 				}
 				log.Info(fileInfo)
 				_ = os.Remove(infoFullPath)
-				if _, err = this.SaveFileInfoToLevelDB(info.ID, fileInfo, this.ldb); err != nil {
+				if _, err = s.SaveFileInfoToLevelDB(info.ID, fileInfo, s.ldb); err != nil {
 					//assosiate file id
 					_ = log.Error(err)
 				}
-				this.SaveFileMd5Log(fileInfo, config.CONST_FILE_Md5_FILE_NAME)
-				go this.postFileToPeer(fileInfo)
+				s.SaveFileMd5Log(fileInfo, config.CONST_FILE_Md5_FILE_NAME)
+				go s.postFileToPeer(fileInfo)
 				callBack := func(info tusd.FileInfo, fileInfo *model.FileInfo) {
 					if callback_url, ok := info.MetaData["callback_url"]; ok {
 						req := httplib.Post(callback_url)
 						req.SetTimeout(time.Second*10, time.Second*10)
-						req.Param("info", this.util.JsonEncodePretty(fileInfo))
+						req.Param("info", s.util.JsonEncodePretty(fileInfo))
 						req.Param("id", info.ID)
 						if _, err := req.String(); err != nil {
 							_ = log.Error(err)

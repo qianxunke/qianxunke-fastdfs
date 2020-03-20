@@ -31,7 +31,7 @@ import (
 
 
 
-func (this *server) ParseSmallFile(filename string) (string, int64, int, error) {
+func (s *server) ParseSmallFile(filename string) (string, int64, int, error) {
 	var (
 		err    error
 		offset int64
@@ -63,14 +63,14 @@ func (this *server) ParseSmallFile(filename string) (string, int64, int, error) 
 }
 
 
-func (this *server) SetDownloadHeader(w http.ResponseWriter, r *http.Request) {
+func (s *server) SetDownloadHeader(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", "attachment")
 }
 
 
 
-func (this *server) RepairFileInfoFromFile() {
+func (s *server) RepairFileInfoFromFile() {
 	var (
 		pathPrefix string
 		err        error
@@ -84,12 +84,12 @@ func (this *server) RepairFileInfoFromFile() {
 			_ = log.Error(string(buffer))
 		}
 	}()
-	if this.lockMap.IsLock("RepairFileInfoFromFile") {
+	if s.lockMap.IsLock("RepairFileInfoFromFile") {
 		_ = log.Warn("Lock RepairFileInfoFromFile")
 		return
 	}
-	this.lockMap.LockKey("RepairFileInfoFromFile")
-	defer this.lockMap.UnLockKey("RepairFileInfoFromFile")
+	s.lockMap.LockKey("RepairFileInfoFromFile")
+	defer s.lockMap.UnLockKey("RepairFileInfoFromFile")
 	handlefunc := func(file_path string, f os.FileInfo, err error) error {
 		var (
 			files    []os.FileInfo
@@ -119,7 +119,7 @@ func (this *server) RepairFileInfoFromFile() {
 					log.Info(fmt.Sprintf("ignore small file file %s", file_path+"/"+fi.Name()))
 					continue
 				}
-				pathMd5 = this.util.MD5(file_path + "/" + fi.Name())
+				pathMd5 = s.util.MD5(file_path + "/" + fi.Name())
 				//if finfo, _ := this.GetFileInfoFromLevelDB(pathMd5); finfo != nil && finfo.Md5 != "" {
 				//	log.Info(fmt.Sprintf("exist ignore file %s", file_path+"/"+fi.Name()))
 				//	continue
@@ -136,14 +136,14 @@ func (this *server) RepairFileInfoFromFile() {
 					Path:      file_path,
 					Md5:       sum,
 					TimeStamp: fi.ModTime().Unix(),
-					PeerStr:     this.host,
+					PeerStr:   s.host,
 					OffSet:    -2,
 				}
 				//log.Info(fileInfo)
 				log.Info(file_path, "/", fi.Name())
-				this.PeerAppendToQueue(&fileInfo)
+				s.PeerAppendToQueue(&fileInfo)
 				//this.postFileToPeer(&fileInfo)
-				_, _ = this.SaveFileInfoToLevelDB(fileInfo.Md5, &fileInfo, this.ldb)
+				_, _ = s.SaveFileInfoToLevelDB(fileInfo.Md5, &fileInfo, s.ldb)
 				//this.SaveFileMd5Log(&fileInfo, CONST_FILE_Md5_FILE_NAME)
 			}
 		}
@@ -170,7 +170,7 @@ func (this *server) RepairFileInfoFromFile() {
 }
 
 
-func (this *server) RepairStatByDate(date string) model.StatDateFileInfo {
+func (s *server) RepairStatByDate(date string) model.StatDateFileInfo {
 	defer func() {
 		if re := recover(); re != nil {
 			buffer := debug.Stack()
@@ -189,7 +189,7 @@ func (this *server) RepairStatByDate(date string) model.StatDateFileInfo {
 	)
 	keyPrefix = "%s_%s_"
 	keyPrefix = fmt.Sprintf(keyPrefix, date, config.CONST_FILE_Md5_FILE_NAME)
-	iter := this.logDB.NewIterator(util.BytesPrefix([]byte(keyPrefix)), nil)
+	iter := s.logDB.NewIterator(util.BytesPrefix([]byte(keyPrefix)), nil)
 	defer iter.Release()
 	for iter.Next() {
 		if err = json.Unmarshal(iter.Value(), &fileInfo); err != nil {
@@ -198,16 +198,16 @@ func (this *server) RepairStatByDate(date string) model.StatDateFileInfo {
 		fileCount = fileCount + 1
 		fileSize = fileSize + fileInfo.Size
 	}
-	this.statMap.Put(date+"_"+config.CONST_STAT_FILE_COUNT_KEY, fileCount)
-	this.statMap.Put(date+"_"+config.CONST_STAT_FILE_TOTAL_SIZE_KEY, fileSize)
-	this.SaveStat()
+	s.statMap.Put(date+"_"+config.CONST_STAT_FILE_COUNT_KEY, fileCount)
+	s.statMap.Put(date+"_"+config.CONST_STAT_FILE_TOTAL_SIZE_KEY, fileSize)
+	s.SaveStat()
 	stat.Date = date
 	stat.FileCount = fileCount
 	stat.TotalSize = fileSize
 	return stat
 }
 
-func (this *server) GetFilePathByInfo(fileInfo *model.FileInfo, withDocker bool) string {
+func (s *server) GetFilePathByInfo(fileInfo *model.FileInfo, withDocker bool) string {
 	var (
 		fn string
 	)
@@ -221,7 +221,7 @@ func (this *server) GetFilePathByInfo(fileInfo *model.FileInfo, withDocker bool)
 	return fileInfo.Path + "/" + fn
 }
 
-func (this *server) CheckFileExistByInfo(md5s string, fileInfo *model.FileInfo) bool {
+func (s *server) CheckFileExistByInfo(md5s string, fileInfo *model.FileInfo) bool {
 	var (
 		err      error
 		fullpath string
@@ -233,13 +233,13 @@ func (this *server) CheckFileExistByInfo(md5s string, fileInfo *model.FileInfo) 
 	}
 	if fileInfo.OffSet >= 0 {
 		//small file
-		if info, err = this.GetFileInfoFromLevelDB(fileInfo.Md5); err == nil && info.Md5 == fileInfo.Md5 {
+		if info, err = s.GetFileInfoFromLevelDB(fileInfo.Md5); err == nil && info.Md5 == fileInfo.Md5 {
 			return true
 		} else {
 			return false
 		}
 	}
-	fullpath = this.GetFilePathByInfo(fileInfo, true)
+	fullpath = s.GetFilePathByInfo(fileInfo, true)
 	if fi, err = os.Stat(fullpath); err != nil {
 		return false
 	}
@@ -251,7 +251,7 @@ func (this *server) CheckFileExistByInfo(md5s string, fileInfo *model.FileInfo) 
 }
 
 
-func (this *server) CrossOrigin(w http.ResponseWriter, r *http.Request) {
+func (s *server) CrossOrigin(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Depth, User-Agent, X-File-Size, X-Requested-With, X-Requested-By, If-Modified-Since, X-File-Name, X-File-Type, Cache-Control, Origin")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
@@ -259,7 +259,7 @@ func (this *server) CrossOrigin(w http.ResponseWriter, r *http.Request) {
 	//https://blog.csdn.net/yanzisu_congcong/article/details/80552155
 }
 
-func (this *server) CheckAuth(w http.ResponseWriter, r *http.Request) bool {
+func (s *server) CheckAuth(w http.ResponseWriter, r *http.Request) bool {
 	var (
 		err        error
 		req        *httplib.BeegoHTTPRequest
@@ -300,12 +300,12 @@ func (this *server) CheckAuth(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-func (this *server) NotPermit(w http.ResponseWriter, r *http.Request) {
+func (s *server) NotPermit(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(401)
 }
 
 
-func (this *server) GetFilePathFromRequest(w http.ResponseWriter, r *http.Request) (string, string) {
+func (s *server) GetFilePathFromRequest(w http.ResponseWriter, r *http.Request) (string, string) {
 	var (
 		err       error
 		fullpath  string
@@ -332,7 +332,7 @@ func (this *server) GetFilePathFromRequest(w http.ResponseWriter, r *http.Reques
 	return fullpath, smallPath
 }
 
-func (this *server) CheckDownloadAuth(w http.ResponseWriter, r *http.Request) (bool, error) {
+func (s *server) CheckDownloadAuth(w http.ResponseWriter, r *http.Request) (bool, error) {
 	var (
 		err          error
 		maxTimestamp int64
@@ -346,15 +346,15 @@ func (this *server) CheckDownloadAuth(w http.ResponseWriter, r *http.Request) (b
 		fileInfo     *model.FileInfo
 	)
 	CheckToken := func(token string, md5sum string, timestamp string) bool {
-		if this.util.MD5(md5sum+timestamp) != token {
+		if s.util.MD5(md5sum+timestamp) != token {
 			return false
 		}
 		return true
 	}
-	if config.Config().EnableDownloadAuth && config.Config().AuthUrl != "" && !this.IsPeer(r) && !this.CheckAuth(w, r) {
+	if config.Config().EnableDownloadAuth && config.Config().AuthUrl != "" && !s.IsPeer(r) && !s.CheckAuth(w, r) {
 		return false, errors.New("auth fail")
 	}
-	if config.Config().DownloadUseToken && !this.IsPeer(r) {
+	if config.Config().DownloadUseToken && !s.IsPeer(r) {
 		token = r.FormValue("token")
 		timestamp = r.FormValue("timestamp")
 		if token == "" || timestamp == "" {
@@ -370,13 +370,13 @@ func (this *server) CheckDownloadAuth(w http.ResponseWriter, r *http.Request) (b
 		if ts > maxTimestamp || ts < minTimestamp {
 			return false, errors.New("timestamp expire")
 		}
-		fullpath, smallPath = this.GetFilePathFromRequest(w, r)
+		fullpath, smallPath = s.GetFilePathFromRequest(w, r)
 		if smallPath != "" {
-			pathMd5 = this.util.MD5(smallPath)
+			pathMd5 = s.util.MD5(smallPath)
 		} else {
-			pathMd5 = this.util.MD5(fullpath)
+			pathMd5 = s.util.MD5(fullpath)
 		}
-		if fileInfo, err = this.GetFileInfoFromLevelDB(pathMd5); err != nil {
+		if fileInfo, err = s.GetFileInfoFromLevelDB(pathMd5); err != nil {
 			// TODO
 		} else {
 			ok := CheckToken(token, fileInfo.Md5, timestamp)
@@ -389,7 +389,7 @@ func (this *server) CheckDownloadAuth(w http.ResponseWriter, r *http.Request) (b
 	return true, nil
 }
 
-func (this *server) GetSmallFileByURI(w http.ResponseWriter, r *http.Request) ([]byte, bool, error) {
+func (s *server) GetSmallFileByURI(w http.ResponseWriter, r *http.Request) ([]byte, bool, error) {
 	var (
 		err      error
 		data     []byte
@@ -398,8 +398,8 @@ func (this *server) GetSmallFileByURI(w http.ResponseWriter, r *http.Request) ([
 		fullpath string
 		info     os.FileInfo
 	)
-	fullpath, _ = this.GetFilePathFromRequest(w, r)
-	if _, offset, length, err = this.ParseSmallFile(r.RequestURI); err != nil {
+	fullpath, _ = s.GetFilePathFromRequest(w, r)
+	if _, offset, length, err = s.ParseSmallFile(r.RequestURI); err != nil {
 		return nil, false, err
 	}
 	if info, err = os.Stat(fullpath); err != nil {
@@ -408,7 +408,7 @@ func (this *server) GetSmallFileByURI(w http.ResponseWriter, r *http.Request) ([
 	if info.Size() < offset+int64(length) {
 		return nil, true, errors.New("noFound")
 	} else {
-		data, err = this.util.ReadFileByOffSet(fullpath, offset, length)
+		data, err = s.util.ReadFileByOffSet(fullpath, offset, length)
 		if err != nil {
 			return nil, false, err
 		}
@@ -418,7 +418,7 @@ func (this *server) GetSmallFileByURI(w http.ResponseWriter, r *http.Request) ([
 
 
 //image
-func (this *server) ResizeImageByBytes(w http.ResponseWriter, data []byte, width, height uint) {
+func (s *server) ResizeImageByBytes(w http.ResponseWriter, data []byte, width, height uint) {
 	var (
 		img     image.Image
 		err     error
@@ -440,7 +440,7 @@ func (this *server) ResizeImageByBytes(w http.ResponseWriter, data []byte, width
 	}
 }
 
-func (this *server) ResizeImage(w http.ResponseWriter, fullpath string, width, height uint) {
+func (s *server) ResizeImage(w http.ResponseWriter, fullpath string, width, height uint) {
 	var (
 		img     image.Image
 		err     error
@@ -472,7 +472,7 @@ func (this *server) ResizeImage(w http.ResponseWriter, fullpath string, width, h
 
 
 
-func (this *server) getRequestURI(action string) string {
+func (s *server) getRequestURI(action string) string {
 	var (
 		uri string
 	)
@@ -484,28 +484,28 @@ func (this *server) getRequestURI(action string) string {
 	return uri
 }
 
-func (this *server) GetClusterNotPermitMessage(r *http.Request) string {
+func (s *server) GetClusterNotPermitMessage(r *http.Request) string {
 	var (
 		message string
 	)
-	message = fmt.Sprintf(config.CONST_MESSAGE_CLUSTER_IP, this.util.GetClientIp(r))
+	message = fmt.Sprintf(config.CONST_MESSAGE_CLUSTER_IP, s.util.GetClientIp(r))
 	return message
 }
 
 
-func (this *server) GetServerURI(r *http.Request) string {
+func (s *server) GetServerURI(r *http.Request) string {
 	return fmt.Sprintf("http://%s/", r.Host)
 }
 
-func (this *server) FormatStatInfo() {
+func (s *server) FormatStatInfo() {
 	var (
 		data  []byte
 		err   error
 		count int64
 		stat  map[string]interface{}
 	)
-	if this.util.FileExists(config.CONST_STAT_FILE_NAME) {
-		if data, err = this.util.ReadBinFile(config.CONST_STAT_FILE_NAME); err != nil {
+	if s.util.FileExists(config.CONST_STAT_FILE_NAME) {
+		if data, err = s.util.ReadBinFile(config.CONST_STAT_FILE_NAME); err != nil {
 			_ = log.Error(err)
 		} else {
 			if err = json.Unmarshal(data, &stat); err != nil {
@@ -518,20 +518,20 @@ func (this *server) FormatStatInfo() {
 						if count, err = strconv.ParseInt(vv, 10, 64); err != nil {
 							_ = log.Error(err)
 						} else {
-							this.statMap.Put(k, count)
+							s.statMap.Put(k, count)
 						}
 					default:
-						this.statMap.Put(k, v)
+						s.statMap.Put(k, v)
 					}
 				}
 			}
 		}
 	} else {
-		this.RepairStatByDate(this.util.GetToDay())
+		s.RepairStatByDate(s.util.GetToDay())
 	}
 }
 
-func (this *server) CheckScene(scene string) (bool, error) {
+func (s *server) CheckScene(scene string) (bool, error) {
 	var (
 		scenes []string
 	)
@@ -541,14 +541,14 @@ func (this *server) CheckScene(scene string) (bool, error) {
 	for _, s := range config.Config().Scenes {
 		scenes = append(scenes, strings.Split(s, ":")[0])
 	}
-	if !this.util.Contains(scene, scenes) {
+	if !s.util.Contains(scene, scenes) {
 		return false, errors.New("not valid scene")
 	}
 	return true, nil
 }
 
 
-func (this *server) BuildFileResult(fileInfo *model.FileInfo, r *http.Request) model.FileResult {
+func (s *server) BuildFileResult(fileInfo *model.FileInfo, r *http.Request) model.FileResult {
 	var (
 		outname     string
 		fileResult  model.FileResult
@@ -597,7 +597,7 @@ func (this *server) BuildFileResult(fileInfo *model.FileInfo, r *http.Request) m
 
 
 //md5
-func (this *server) GetMd5sMapByDate(date string, filename string) (*goutil.CommonMap, error) {
+func (s *server) GetMd5sMapByDate(date string, filename string) (*goutil.CommonMap, error) {
 	var (
 		err     error
 		result  *goutil.CommonMap
@@ -614,7 +614,7 @@ func (this *server) GetMd5sMapByDate(date string, filename string) (*goutil.Comm
 	} else {
 		fpath = config.DATA_DIR + "/" + date + "/" + filename
 	}
-	if !this.util.FileExists(fpath) {
+	if !s.util.FileExists(fpath) {
 		return result, errors.New(fmt.Sprintf("fpath %s not found", fpath))
 	}
 	if data, err = ioutil.ReadFile(fpath); err != nil {
@@ -634,7 +634,7 @@ func (this *server) GetMd5sMapByDate(date string, filename string) (*goutil.Comm
 	return result, nil
 }
 
-func (this *server) GetMd5sByDate(date string, filename string) (mapset.Set, error) {
+func (s *server) GetMd5sByDate(date string, filename string) (mapset.Set, error) {
 	var (
 		keyPrefix string
 		md5set    mapset.Set
@@ -643,7 +643,7 @@ func (this *server) GetMd5sByDate(date string, filename string) (mapset.Set, err
 	md5set = mapset.NewSet()
 	keyPrefix = "%s_%s_"
 	keyPrefix = fmt.Sprintf(keyPrefix, date, filename)
-	iter := this.logDB.NewIterator(util.BytesPrefix([]byte(keyPrefix)), nil)
+	iter := s.logDB.NewIterator(util.BytesPrefix([]byte(keyPrefix)), nil)
 	for iter.Next() {
 		keys = strings.Split(string(iter.Key()), "_")
 		if len(keys) >= 3 {
@@ -654,20 +654,20 @@ func (this *server) GetMd5sByDate(date string, filename string) (mapset.Set, err
 	return md5set, nil
 }
 
-func (this *server) SaveFileMd5Log(fileInfo *model.FileInfo, filename string) {
+func (s *server) SaveFileMd5Log(fileInfo *model.FileInfo, filename string) {
 	var (
 		info model.FileInfo
 	)
-	for len(this.queueFileLog)+len(this.queueFileLog)/10 > CONST_QUEUE_SIZE {
+	for len(s.queueFileLog)+len(s.queueFileLog)/10 > CONST_QUEUE_SIZE {
 		time.Sleep(time.Second * 1)
 	}
 	info = *fileInfo
-	this.queueFileLog <- &model.FileLog{FileInfo: &info, FileName: filename}
+	s.queueFileLog <- &model.FileLog{FileInfo: &info, FileName: filename}
 }
 
 
 //存储文件日志和文件
-func (this *server) saveFileMd5Log(fileInfo *model.FileInfo, filename string) {
+func (s *server) saveFileMd5Log(fileInfo *model.FileInfo, filename string) {
 	var (
 		err      error
 		logDate  string
@@ -686,16 +686,16 @@ func (this *server) saveFileMd5Log(fileInfo *model.FileInfo, filename string) {
 		_ = log.Warn("saveFileMd5Log", fileInfo, filename)
 		return
 	}
-	logDate = this.util.GetDayFromTimeStamp(fileInfo.TimeStamp)
+	logDate = s.util.GetDayFromTimeStamp(fileInfo.TimeStamp)
 	logKey = fmt.Sprintf("%s_%s_%s", logDate, filename, fileInfo.Md5)
 	if filename == config.CONST_FILE_Md5_FILE_NAME {
 		//this.searchMap.Put(fileInfo.Md5, fileInfo.Name)
-		if ok, err = this.IsExistFromLevelDB(fileInfo.Md5, this.ldb); !ok {
-			this.statMap.AddCountInt64(logDate+"_"+config.CONST_STAT_FILE_COUNT_KEY, 1)
-			this.statMap.AddCountInt64(logDate+"_"+config.CONST_STAT_FILE_TOTAL_SIZE_KEY, fileInfo.Size)
-			this.SaveStat()
+		if ok, err = s.IsExistFromLevelDB(fileInfo.Md5, s.ldb); !ok {
+			s.statMap.AddCountInt64(logDate+"_"+config.CONST_STAT_FILE_COUNT_KEY, 1)
+			s.statMap.AddCountInt64(logDate+"_"+config.CONST_STAT_FILE_TOTAL_SIZE_KEY, fileInfo.Size)
+			s.SaveStat()
 		}
-		if _, err = this.SaveFileInfoToLevelDB(logKey, fileInfo, this.logDB); err != nil {
+		if _, err = s.SaveFileInfoToLevelDB(logKey, fileInfo, s.logDB); err != nil {
 			_ = log.Error(err)
 		}
 		dao,_:=model.GetDao()
@@ -706,12 +706,12 @@ func (this *server) saveFileMd5Log(fileInfo *model.FileInfo, filename string) {
 	}
 	if filename == config.CONST_REMOME_Md5_FILE_NAME {
 		//this.searchMap.Remove(fileInfo.Md5)
-		if ok, err = this.IsExistFromLevelDB(fileInfo.Md5, this.ldb); ok {
-			this.statMap.AddCountInt64(logDate+"_"+config.CONST_STAT_FILE_COUNT_KEY, -1)
-			this.statMap.AddCountInt64(logDate+"_"+config.CONST_STAT_FILE_TOTAL_SIZE_KEY, -fileInfo.Size)
-			this.SaveStat()
+		if ok, err = s.IsExistFromLevelDB(fileInfo.Md5, s.ldb); ok {
+			s.statMap.AddCountInt64(logDate+"_"+config.CONST_STAT_FILE_COUNT_KEY, -1)
+			s.statMap.AddCountInt64(logDate+"_"+config.CONST_STAT_FILE_TOTAL_SIZE_KEY, -fileInfo.Size)
+			s.SaveStat()
 		}
-		_ = this.RemoveKeyFromLevelDB(logKey, this.logDB)
+		_ = s.RemoveKeyFromLevelDB(logKey, s.logDB)
 
 		dao,_:=model.GetDao()
 		if dao!=nil{
@@ -719,8 +719,8 @@ func (this *server) saveFileMd5Log(fileInfo *model.FileInfo, filename string) {
 		}
 		// remove files.md5 for stat info(repair from logDB)
 		logKey = fmt.Sprintf("%s_%s_%s", logDate, config.CONST_FILE_Md5_FILE_NAME, fileInfo.Md5)
-		_ = this.RemoveKeyFromLevelDB(logKey, this.logDB)
+		_ = s.RemoveKeyFromLevelDB(logKey, s.logDB)
 		return
 	}
-	_, _ = this.SaveFileInfoToLevelDB(logKey, fileInfo, this.logDB)
+	_, _ = s.SaveFileInfoToLevelDB(logKey, fileInfo, s.logDB)
 }
