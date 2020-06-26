@@ -97,7 +97,7 @@ func NewServer() (ServiceInface, error) {
 		MaxIdleConnsPerHost: 100,
 	}
 	settins := httplib.BeegoHTTPSettings{
-		UserAgent:        "Go-FastDFS",
+		UserAgent:        "Qainxunke-FastDFS",
 		ConnectTimeout:   15 * time.Second,
 		ReadWriteTimeout: 15 * time.Second,
 		Gzip:             true,
